@@ -214,3 +214,4 @@ public static void fun(StringBuffer temp) {
 - String的内容不可修改，StringBuffer与StringBuilder的内容可以修改.
 - StringBuffer与StringBuilder大部分功能是相似的
 - StringBuffer采用同步处理，属于线程安全操作；而StringBuilder采用异步处理，属于线程不安全操作
+								   
