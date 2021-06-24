@@ -498,6 +498,7 @@
 - yum -y remove xx：卸载指定的yum包
 
 [图片](http://localhost:8080/DBed/imageShow?imageId=22)
+http://localhost:8080/DBed/imageShow?imageId=22
 
 
 
