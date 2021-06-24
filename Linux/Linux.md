@@ -499,6 +499,7 @@
 
 [图片](http://localhost:8080/DBed/imageShow?imageId=22)
 http://localhost:8080/DBed/imageShow?imageId=22
+![图片](http://localhost:8080/DBed/imageShow?imageId=22)
 
 
 
