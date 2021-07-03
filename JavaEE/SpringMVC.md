@@ -303,8 +303,6 @@ public @interface RestController {
 ...
 ```
 
-##### 1 2 3 4 5 6 7
-
 ```
 package org.example.demo.controller;
 ```
