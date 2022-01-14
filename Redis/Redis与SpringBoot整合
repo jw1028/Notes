@@ -1,0 +1,205 @@
+@[TOC](Redis学习之旅--SpringBoot整合)
+在学习SpringBoot整合Redis之前我们先来了解一下Jedis。
+# Jedis
+## 概念 
+Jedis 是 Redis 官方推荐的 java连接开发工具！<code> 使用Java 操作Redis 中间件！</code>如果你要使用java操作redis，那么一定要对Jedis 十分的熟悉！
+## 使用
+
+ - 1、导入对应的依赖
+ 
+
+```bash
+ <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>4.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.38</version>
+ </dependency>
+```
+
+ - 2、编码测试：
+
+连接数据库
+操作命令
+断开连接！
+代码
+
+```java
+/**
+ * 测试Jedis连接
+ */
+public class TestPing {
+    public static void main(String[] args) {
+        //1.new Jedis对象即可
+        Jedis jedis = new Jedis("127.0.0.1",6379);
+         //测试连接
+        System.out.println(jedis.ping());
+    }
+}
+```
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/4ab55cb25d694d8983b3a66dc9070f95.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+常用的API，所有的api命令与Redis没有区别。这里重点讲一下事务的相关API，其他的API使用可以参考这里：
+
+```java
+public class TestMulti {
+    public static void main(String[] args) {
+        //创建客户端连接服务端，redis服务端需要被开启
+        Jedis jedis = new Jedis("127.0.0.1", 6379);
+        jedis.flushDB();
+
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("hello", "world");
+        jsonObject.put("name", "java");
+        //开启事务
+        Transaction multi = jedis.multi();
+        String result = jsonObject.toJSONString();
+        try {
+            //向redis存入一条数据
+            multi.set("json", result);
+            //再存入一条数据
+            multi.set("json2", result);
+            //这里引发了异常，用0作为被除数
+            int i = 100/0;
+            //如果没有引发异常，执行进入队列的命令
+            multi.exec();
+        } catch (Exception e) {
+            e.printStackTrace();
+            //如果出现异常，回滚
+            multi.discard();
+        } finally {
+            System.out.println(jedis.get("json"));
+            System.out.println(jedis.get("json2"));
+            //最终关闭客户端
+            jedis.close();
+        }
+    }
+}
+```
+
+# SpringBoot
+SpringBoot 操作数据：spring-data jpa jdbc mongodb redis！
+SpringData 也是和 SpringBoot 齐名的项目！
+说明： 在 SpringBoot2.x 之后，原来使用的jedis 被替换为了 lettuce?
+
+ - **jedis** : 采用的直连，多个线程操作的话，是不安全的，如果想要避免不安全的，使用 jedis pool 连接 池！ 更像 BIO 模式
+ - **lettuce** : 采用netty，实例可以再多个线程中进行共享，不存在线程不安全的情况！可以减少线程数据 了，更像 NIO 模式
+ 
+ 
+## 配置文件源码分析：
+
+
+```java
+ @Bean
+    @ConditionalOnMissingBean(
+        name = {"redisTemplate"}
+    )
+    //ConditionalOnSingleCandidate 如果没有这个类，则使用这个类
+    //我们可以自己定义一个redisTemplate来替换这个默认的！
+ @ConditionalOnSingleCandidate(RedisConnectionFactory.class)
+    public RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory redisConnectionFactory) {
+    //默认的 RedisTemplate 没有过多地设置，redis对象都是需要序列化的！
+    //两个泛型都是 Object类型，我们之后使用需要强制类型转换 <String Object>
+        RedisTemplate<Object, Object> template = new RedisTemplate();
+        template.setConnectionFactory(redisConnectionFactory);
+        return template;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    //由于string 是redis中最常使用的类型，所以说单独提出来了一个bean！@ConditionalOnSingleCandidate(RedisConnectionFactory.class)
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory redisConnectionFactory) {
+        return new StringRedisTemplate(redisConnectionFactory);
+    }
+```
+## 整合测试
+1、导入依赖
+
+```java
+		<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+```
+
+2、配置连接
+
+```java
+# 配置redis 
+spring.redis.host=127.0.0.1 
+spring.redis.port=6379
+```
+3、测试！
+
+```java
+@SpringBootTest
+class RedisSpringbootApplicationTests {
+
+    @Autowired
+    private RedisTemplate<String,String> redisTemplate;
+
+    @Test
+    void contextLoads() {
+        // redisTemplate 操作不同的数据类型，api和我们的指令是一样的
+        // opsForValue 操作字符串 类似String
+        // opsForList 操作List 类似List
+        // opsForSet
+        // opsForHash
+        // opsForZSet
+        // opsForGeo
+        // opsForHyperLogLog
+        // 除了进本的操作，我们常用的方法都可以直接通过redisTemplate操作，比如事务，和基本的 CRUD
+        // 获取redis的连接对象
+//        RedisConnection connection = redisTemplate.getConnectionFactory().getConnection();
+//        connection.flushDb();
+//        connection.flushAll();
+        redisTemplate.opsForValue().set("key","myValue");
+        System.out.println(redisTemplate.opsForValue().get("key"));
+    }
+
+}
+```
+
+## 自己的 RedisTemplete
+因为默认的序列化方式是JDK序列化，我们可能会用到Json来序列化，我们来编写一个自己的 RedisTemplete，方便使用
+![在这里插入图片描述](https://img-blog.csdnimg.cn/9d85b143d5ea4b0181ad634b2a9b8dbd.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/84f9824ebe364a63937fe67754fb1f65.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+
+```java
+@Configuration
+public class RedisConfig {
+
+  @Bean
+  @SuppressWarnings("all")
+  public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+      RedisTemplate<String, Object> template = new RedisTemplate<String, Object>();
+      template.setConnectionFactory(factory);
+      Jackson2JsonRedisSerializer jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer(Object.class);
+      ObjectMapper om = new ObjectMapper();
+      om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+      om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+      jackson2JsonRedisSerializer.setObjectMapper(om);
+      StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+
+      // key采用String的序列化方式
+      template.setKeySerializer(stringRedisSerializer);
+      // hash的key也采用String的序列化方式
+      template.setHashKeySerializer(stringRedisSerializer);
+      // value序列化方式采用jackson
+      template.setValueSerializer(jackson2JsonRedisSerializer);
+      // hash的value序列化方式采用jackson
+      template.setHashValueSerializer(jackson2JsonRedisSerializer);
+      template.afterPropertiesSet();
+
+      return template;
+  }
+  
+}
+```
+
+
