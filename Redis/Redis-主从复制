@@ -1,0 +1,163 @@
+@[TOC](Redis学习之旅--主从复制)
+# 主从复制
+## 相关概念
+主从复制，是指将一台Redis服务器的数据，复制到其他的Redis服务器。前者称为主节点(master/leader)，后者称为从节点(slave/follower)；
+
+ - **数据的复制是单向的，只能由主节点到从节点。**
+ - **Master以写为主，Slave 以读为主。**
+ - <code>默认情况下，每台Redis服务器都是主节点；
+ - 一个主节点可以有多个从节点(或没有从节点)，但一个从节点只能有一个主节点。
+
+## 主从复制的应用
+
+ - 1、**数据冗余**：主从复制实现了数据的热备份，是持久化之外的一种数据冗余方式。
+ - 2、**故障恢复**：当主节点出现问题时，可以由从节点提供服务，实现快速的故障恢复；实际上是一种服务 的冗余。
+ - 3、**负载均衡**：在主从复制的基础上，配合读写分离，可以由主节点提供写服务，由从节点提供读服务（即写Redis数据时应用连接主节点，读Redis数据时应用连接从节点），分担服务器负载；尤其是在写少读多的场景下，通过多个从节点分担读负载，可以大大提高Redis服务器的并发量。
+ - 4、**高可用（集群）基石**：除了上述作用以外，主从复制还是哨兵和集群能够实施的基础，因此说主从复 制是Redis高可用的基础。
+
+##	主从复制的意义
+
+一般来说，要将Redis运用于工程项目中，只使用一台Redis是万万不能的（宕机），原因如下：
+
+ - 1、从结构上，单个Redis服务器会发生单点故障，并且一台服务器需要处理所有的请求负载，压力较大；
+
+2、从容量上，单个Redis服务器内存容量有限，就算一台Redis服务器内存容量为256G，也不能将所有内存用作Redis存储内存，一般来说，<code>单台Redis最大使用内存不应该超过20G。</code>
+电商网站上的商品，一般都是一次上传，无数次浏览的，说专业点也就是"多读少写"。
+对于这种场景，我们可以使如下这种架构：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/5adbd8a3fd9a4e8580b1eaae9631b804.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+主从复制，读写分离！ 80% 的情况下都是在进行读操作！减缓服务器的压力！架构中经常使用！ 一主二从！
+只要在公司中，主从复制就是必须要使用的，因为在真实的项目中不可能单机使用Redis！
+# 测试
+## 环境配置
+只配置从库，不用配置主库！
+
+ - 查看当前配置信息  **info replication**
+
+```bash
+127.0.0.1:6379> info replication	#查看当前库的信息
+# Replication
+role:master		#角色 master
+connected_slaves:0	#从机的个数（目前没有）
+master_replid:0a24bb6800f3566379d0953f6b86769d019b8fe4
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:0
+second_repl_offset:-1
+repl_backlog_active:0
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:0
+repl_backlog_histlen:0
+
+```
+
+复制3个配置文件，然后修改对应的信息
+1、端口
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/4e42071595264cbe8d327baa130c5e3f.png)
+2、pid 名字
+![在这里插入图片描述](https://img-blog.csdnimg.cn/f7bcfb76ee5c4ca9a8d1cfcb6b6e4678.png)
+
+3、log文件名字
+![在这里插入图片描述](https://img-blog.csdnimg.cn/f288906cc46140c6b0c6adc5e8aec849.png)
+4、dump.rdb 名字
+![在这里插入图片描述](https://img-blog.csdnimg.cn/a5bf6acbf0c3494fb805b8e9cb46ef8f.png)
+修改完毕之后，启动我们的3个redis服务器，可以通过进程信息查看！
+![在这里插入图片描述](https://img-blog.csdnimg.cn/38b5141b6db44bf49e82fdfb5a9a048c.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+## 一主二从模式
+<code>默认情况下，每台Redis服务器都是主节点；</code>
+ 我们一般情况下只用配置从机就好了！认老大！ 一主 （79）二从（80，81）
+
+
+查看主机 **info replication**
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/df449100a0f24ddcb3ab84b09a5550f3.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+
+配置从机 **slaveof 127.0.0.1 6379**
+![在这里插入图片描述](https://img-blog.csdnimg.cn/0be8cfd582d34f2c9c6cf23167ac5680.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/51a0d1128b4147d092a01fb4feaf0a22.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+
+查看主机 **info replication**
+![在这里插入图片描述](https://img-blog.csdnimg.cn/ecaf27f4725a4340833788012018d08e.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+使用相同的命令将6181的端口也配置为6379的从机
+![在这里插入图片描述](https://img-blog.csdnimg.cn/cefe8955f0d348ac9b18b50afce087ba.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+<code>真实的从主配置应该在配置文件中配置(之前讲到过），这样的话是永久的，我们这里使用的是命令，暂时的！
+![在这里插入图片描述](https://img-blog.csdnimg.cn/612ff5213357451a843b786753f6ef0a.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+## 验证
+<code>主机可以写，从机不能写只能读！</code>主机中的所有信息和数据，都会自动被从机保存！
+
+ - 主机写
+![在这里插入图片描述](https://img-blog.csdnimg.cn/e27ff8bc775240d8843d8c1d0bee44d4.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+ - 从机只能读，不能写
+![在这里插入图片描述](https://img-blog.csdnimg.cn/fe07d1877cec44b290bef2f8770c02c2.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+主机断开连接，从机依旧连接到主机的，但是没有写操作，这个时候，主机如果回来了，从机依旧可以直接获取到主机写的信息！
+ - 主机断开连接，重新连接后设置k2
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/bbe74c0b7d594036b0b042bd467ce5e3.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 从机前后获取k2的值
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/b91ca95252af49eaa8c8413febdd8e8b.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+如果是使用命令行，来配置的主从，这个时候从机如果重启了，就会变回主机！只要再次变为从机，立马就会从主机中获取值！
+
+ - 关闭6781断开的服务，并重新开启（重启后为主机）
+![在这里插入图片描述](https://img-blog.csdnimg.cn/b66ff93629414fb4be3f4e3a8035c836.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/b64ec1c4dbc443bf85ddab68d07747ea.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+ - 此时主机设置值，6381端口便获取不到了
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/02d061640cc14767bd9919d7083f9501.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/22cba89d66ab4fbaafd4d4554c69a331.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 6381再次变为6379的从机后可以再次获取值
+ - ![在这里插入图片描述](https://img-blog.csdnimg.cn/874320f069e84112a7181ae8ce4767da.png)
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/4d84e75839ef4049ba170eb73ba94d79.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+## 复制原理
+Slave 启动成功连接到 master 后会发送一个sync同步命令Master 接到命令，启动后台的存盘进程，同时收集所有接收到的用于修改数据集命令，在后台进程执行完毕之后，<code>master将传送整个数据文件到slave，并完成一次完全同步。
+
+ - **全量复制**：而slave服务在接收到数据库文件数据后，将其存盘并加载到内存中。(第一次连接）
+ - **增量复制**：Master 继续将新的所有收集到的修改命令依次传给slave，完成同步(第二三次之后的数据）
+
+但是只要是重新连接master，一次完全同步（全量复制）将被自动执行！ 我们的数据一定可以在从机中看到！
+
+
+## 层层链路模式
+上一个连接的是Master，下一个连接 Salove！这时候也可以完成我们的主从复制！
+![在这里插入图片描述](https://img-blog.csdnimg.cn/5f9ae45a52a34455b5a96046d66833a1.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 修改6381主机为6380
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/921a40f5e4d345cfbc6f7c4c2754e5b8.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 查看6380和6379的情况
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/e04fecc2f7da4f24831d58465f05055c.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/f88d74b0be3f40cb9f80ea0d4a0af942.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 6379设置值，6381也可以获取到
+![在这里插入图片描述](https://img-blog.csdnimg.cn/9504e748c39840738dbe091e206b893c.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/a73119f62f014baa9173a22b6ca32a77.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+**<code>谋朝篡位</code>**
+
+如果没有老大了，这个时候能不能选择一个老大出来呢？ 手动！
+
+ - 关闭6379端口
+![在这里插入图片描述](https://img-blog.csdnimg.cn/f2d546deaf7846b99054ee3117a963a8.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+ - 6380当老大 slaveof no one
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/57d5d0e32a85458c8d40120b371e7e01.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 6381端口当6380端口的从节点
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/1bc0ceb3641241d5b64dabc987fd3067.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/edebd5cb5a14458c84b344293a5ad429.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+ - 当6379端口回来后，6381已经不属于他了，相当于被篡位了
+
+![在这里插入图片描述](https://img-blog.csdnimg.cn/b8c477beb01147f9978c76a5f0f66138.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+
+如果主机断开了连接，我们可以使用 **slveof no one** 让自己变成主机！其他的节点就可以手动连接到最新的这个主节点（手动）！**如果这个时候老大修复了，那就重新连接！**
+
