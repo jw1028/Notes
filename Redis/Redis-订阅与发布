@@ -1,0 +1,54 @@
+@[TOC](Redis学习之旅--订阅与发布)
+# 原理
+发布订阅系统（pub/sub）是一种<code>消息通信模式</code>,发送者（pub）发送消息，订阅者（sub）接收消息。
+主要分为三部分：
+第一个：消息发送者 、第二个频道、 第三个：消息订阅者！
+![在这里插入图片描述](https://img-blog.csdnimg.cn/556e9b48a09d4091935ad859e409baf4.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+下图展示了频道 channel1 ， 以及订阅这个频道的三个客户端 —— client2 、 client5 和 client1 之间的关系：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/354ee93d82ce43388e7e27b59c2f4fde.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+当有新消息通过 PUBLISH 命令发送给频道 channel1 时， 这个消息就会被发送给订阅它的三个客户端： 
+![在这里插入图片描述](https://img-blog.csdnimg.cn/524a351e89b94042b0f260fd16e9e3b0.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+Redis 通过 PUBLISH 、SUBSCRIBE 和 PSUBSCRIBE 等命令实现发布和订阅功能。
+微信：
+
+ - 通过 SUBSCRIBE 命令订阅某频道后，redis-server 里维护了一个字典，字典的键就是一个个频道！，而字典的值则是一个链表，链表中保存了所有订阅这个 channel 的客户端。SUBSCRIBE 命令的关键，就是将客户端添加到给定 channel 的订阅链表中。
+ - 通过 PUBLISH 命令向订阅者发送消息，redis-server 会使用给定的频道作为键，在它所维护的channel字典中查找记录了订阅这个频道的所有客户端的链表，遍历这个链表，将消息发布给所有订阅者
+ - Pub/Sub 从字面上理解就是发布（Publish）与订阅（Subscribe），在Redis中，你可以设定对某一个key值进行消息发布及消息订阅，当一个key值上进行了消息发布后，所有订阅它的客户端都会收到相应的消息。这一功能最明显的用法就是用作实时消息系统，比如普通的即时聊天，群聊等功能
+
+# 常用命令
+![在这里插入图片描述](https://img-blog.csdnimg.cn/2ea6196e8d0740ada83d0e8d32fa414a.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA6LW1amM=,size_20,color_FFFFFF,t_70,g_se,x_16)
+
+# 测试
+
+ - 订阅端
+
+```bash
+127.0.0.1:6379> subscribe zjc123	#订阅一个频道zjc123
+Reading messages... (press Ctrl-C to quit)
+1) "subscribe"
+2) "zjc123"
+3) (integer) 1
+#等待读取推送的消息
+1) "message"	#消息
+2) "zjc123"		#哪个频道发送的消息
+3) "666"	#消息的具体内容
+1) "message"
+2) "zjc123"
+3) "999"
+```
+
+ - 发送端
+
+```bash
+127.0.0.1:6379> publish zjc123 666	#发布者发布消息到频道
+(integer) 1
+127.0.0.1:6379> publish zjc123 999
+(integer) 1
+```
+
+# 使用场景
+
+ - 1、实时消息系统！
+ - 2、事实聊天！（频道当做聊天室，将信息回显给所有人即可！）
+ - 3、订阅，关注系统都是可以的！
